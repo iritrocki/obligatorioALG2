@@ -8,20 +8,14 @@ struct NodoLista {
     NodoLista* sig;
 };
 
+struct nodoDobleDato {
+    int nivel;
+    int dato;
+};
+
 struct ColaPrioridad {
-    int* array;
+    nodoDobleDato** array;
     int tope;
-};
-
-struct nodoCola {
-    ColaPrioridad* dato;
-    nodoCola* sig;
-};
-
-struct colaFIFO {
-    nodoCola* ppio;
-    nodoCola* ultimo;
-    int cantElem;
 };
 
 struct Grafo {
@@ -54,9 +48,9 @@ void cargarArista(int v, int w, Grafo*& g) {
 
 ColaPrioridad* inicializarCola(int cantV) {
     ColaPrioridad* cola = new ColaPrioridad;
-    cola->array = new int[cantV + 1];
+    cola->array = new nodoDobleDato*[cantV + 1];
     for (int i = 0; i <= cantV; i++) {
-        cola->array[i] = 0;
+        cola->array[i] = NULL;
     }
     cola->tope = 0;
     return cola;
@@ -72,24 +66,28 @@ int padre(int pos) {
 }
 
 void intercambiar(int pos1, int pos2, ColaPrioridad*& cola) {
-    int dato = cola->array[pos1];
+    nodoDobleDato* aux = cola->array[pos1];
     cola->array[pos1] = cola->array[pos2];
-    cola->array[pos2]= dato;
+    cola->array[pos2]= aux;
 }
 
 void flotar(int pos, ColaPrioridad*& cola) {
     if (pos != RAIZ) {
         int posPadre = padre(pos);
-        if (cola->array[posPadre] > cola->array[pos]) {
+        if (cola->array[posPadre]->nivel > cola->array[pos]->nivel || (cola->array[posPadre]->nivel == cola->array[pos]->nivel && cola->array[posPadre]->dato > cola->array[pos]->dato)) {
             intercambiar(pos, posPadre, cola);
             flotar(posPadre, cola);
+        
         }
     }
 }
 
-void encolar(ColaPrioridad*& cola, int dato) {
+void encolar(ColaPrioridad*& cola, int dato, int nivel) {
     cola->tope++;
-    cola->array[cola->tope] = dato;
+    nodoDobleDato* nodo = new nodoDobleDato;
+    nodo->dato = dato;
+    nodo->nivel = nivel;
+    cola->array[cola->tope] = nodo;
     flotar(cola->tope, cola);
 }
 
@@ -108,7 +106,7 @@ bool esHoja(int pos, int tope) {
 int obtenerPosHijoMenor(int pos, ColaPrioridad* cola) {
     int posHijoIzq = hijoIzq(pos);
     int posHijoDer = hijoDer(pos);
-    if (posHijoDer <= cola->tope && cola->array[posHijoDer] < cola->array[posHijoIzq]) {
+    if (posHijoDer <= cola->tope && (cola->array[posHijoDer]->nivel < cola->array[posHijoIzq]->nivel || (cola->array[posHijoDer]->nivel == cola->array[posHijoIzq]->nivel && cola->array[posHijoDer]->dato < cola->array[posHijoIzq]->dato))) {
         return posHijoDer;
     }
     return posHijoIzq;
@@ -117,65 +115,25 @@ int obtenerPosHijoMenor(int pos, ColaPrioridad* cola) {
 void hundir(int pos, ColaPrioridad*& cola) {
     if (!esHoja(pos, cola->tope)) {
         int posHijoMenor = obtenerPosHijoMenor(pos, cola);
-        if (cola->array[posHijoMenor] < cola->array[pos]) {
+        if (cola->array[posHijoMenor]->nivel < cola->array[pos]->nivel || (cola->array[posHijoMenor]->nivel == cola->array[pos]->nivel && cola->array[posHijoMenor]->dato < cola->array[pos]->dato)) {
             intercambiar(pos, posHijoMenor, cola);
             hundir(posHijoMenor, cola);
         }
     }
 }
 
-int desencolar(ColaPrioridad*& cola) {
-    int retorno = cola->array[RAIZ];
+nodoDobleDato* desencolar(ColaPrioridad*& cola) {
+    nodoDobleDato* retorno = cola->array[RAIZ];
     cola->array[RAIZ] = cola->array[cola->tope];
     cola->tope--;
     hundir(RAIZ, cola);
     return retorno;
 }
 
-//COLA FIFO
-colaFIFO* inicializarColaFifo (){
-    colaFIFO* c = new colaFIFO;
-    c->ppio = NULL;
-    c->ultimo = NULL;
-    c->cantElem = 0;
-    return c;
-}
-
-bool esVacia (colaFIFO* cola){
-    return cola->cantElem == 0;
-}
-
-void encolar (colaFIFO*& cola, ColaPrioridad* elem){
-    nodoCola* nodo = new nodoCola;
-    nodo->dato = elem;
-    nodo->sig = NULL;
-    if(esVacia(cola)){
-        cola->ppio = nodo;
-        cola->ultimo = cola->ppio;
-    }else{
-        cola->ultimo->sig = nodo;
-        cola->ultimo = cola->ultimo->sig;
-    }
-    cola->cantElem++;
-}
-
-ColaPrioridad* desencolar (colaFIFO*& cola){
-    //assert(!esVacia(cola));
-    ColaPrioridad* elem = cola->ppio->dato;
-    if(cola->cantElem == 1){
-        cola->ppio = NULL;
-        cola->ultimo = NULL;   
-    }else{
-        cola->ppio = cola->ppio->sig;
-    }
-    cola->cantElem--;
-    return elem;
-}
-
 
 //Algoritmo ordenacion topológica
 void ordenacionTopologica(Grafo* g) {
-    colaFIFO* cola = inicializarColaFifo();
+    ColaPrioridad* cola = inicializarCola(g->vertices);
     int* arrayEntradas = new int[g->vertices + 1];
     for (int i = 0; i <= g->vertices; i++) {
         arrayEntradas[i] = 0;
@@ -183,35 +141,30 @@ void ordenacionTopologica(Grafo* g) {
     for (int i = 1; i <= g->vertices; i++) {
         NodoLista* recorredor = g->listaAdy[i];
         while (recorredor != NULL)
-        {
+        {   
             arrayEntradas[recorredor->dato]++;
             recorredor = recorredor->sig;
         }
     }
-    ColaPrioridad* colaNivelCero = inicializarCola(g->vertices);
     for (int i = 1; i <= g->vertices; i++) {
-        if (arrayEntradas[i] == 0) {
-            encolar(colaNivelCero, i);
+        if(arrayEntradas[i] == 0){
+            encolar(cola, i, 0);
         }
     }
-    encolar(cola, colaNivelCero);
-    while (!esVacia(cola)) {
-        ColaPrioridad* c = desencolar(cola);
-        ColaPrioridad* e = inicializarCola(g->vertices);
-        while(!esVacio(c)){
-            int v = desencolar(c);
-            cout << v << endl;
-            NodoLista* w = g->listaAdy[v];
-            while (w != NULL) {
-                arrayEntradas[w->dato]--;
-                if (arrayEntradas[w->dato] == 0) {
-                    encolar(e, w->dato);
-                }
-                w = w->sig;
+    while(!esVacio(cola)){
+        nodoDobleDato* v = desencolar(cola);
+        cout<< v->dato << endl;
+        NodoLista* w = g->listaAdy[v->dato];
+        while(w!=NULL){
+            arrayEntradas[w->dato]--;
+            if(arrayEntradas[w->dato] == 0){
+                encolar(cola, w->dato, v->nivel+1);
             }
+            w = w->sig;
         }
-        encolar(cola, e);
     }
+
+    
 }
 
 int main() {
