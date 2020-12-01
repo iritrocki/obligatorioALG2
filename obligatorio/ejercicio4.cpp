@@ -227,6 +227,6 @@ int main() {
         cin >> v;
         cin >> w;
         cargarArista(v, w, g);
-    }
+    } //O(E)
     ordenacionTopologica(g);
 }
